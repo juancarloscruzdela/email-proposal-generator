@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sedgemore — Proposal Generator</title>
+<style>
+  :root { --gold:#c9a96e; --charcoal:#1a1a1a; --line:#e0dad0; --muted:#8a8378; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Arial,Helvetica,sans-serif; background:#faf8f5; color:var(--charcoal); height:100vh; display:flex; flex-direction:column; }
+  header { background:var(--charcoal); color:#faf8f5; padding:12px 20px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  header .wordmark { font-family:Georgia,serif; letter-spacing:5px; font-size:16px; }
+  header .sub { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--gold); }
+  header .user { font-size:11px; color:#bdb6a9; }
+  header .spacer { flex:1; }
+  button { font-family:Arial,sans-serif; cursor:pointer; border-radius:2px; }
+  .btn { padding:8px 14px; border:1px solid var(--charcoal); background:var(--charcoal); color:#faf8f5; font-size:12px; letter-spacing:1px; }
+  .btn-gold { background:var(--gold); border-color:var(--gold); color:var(--charcoal); }
+  .btn-outline { background:transparent; border:1px solid #555; color:#faf8f5; padding:7px 12px; font-size:12px; }
+  .btn-ghost { padding:7px 12px; border:1px solid var(--line); background:#fff; color:var(--charcoal); font-size:12px; }
+  .btn-tiny { padding:3px 8px; border:1px solid var(--line); background:#fff; font-size:11px; }
+  .btn-danger { color:#a33; }
+  button:disabled { opacity:.4; cursor:default; }
+  #status { background:var(--gold); color:var(--charcoal); padding:8px 20px; font-size:12px; display:none; }
+  main { display:flex; flex:1; overflow:hidden; }
+  #form-pane { width:44%; min-width:360px; overflow-y:auto; padding:20px; border-right:1px solid var(--line); }
+  #preview-pane { flex:1; background:#efece6; }
+  #preview { width:100%; height:100%; border:none; background:#fff; }
+  label.f { display:block; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:4px; }
+  input, textarea, select { width:100%; padding:8px 10px; border:1px solid #d9d3c8; border-radius:2px; font-size:13px; font-family:Arial,sans-serif; background:#fff; color:var(--charcoal); outline:none; }
+  input:focus, textarea:focus, select:focus { border-color:var(--gold); }
+  textarea { resize:vertical; min-height:60px; }
+  .field { margin-bottom:12px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  .row > .field { flex:1; min-width:110px; }
+  .section-label { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--gold); margin:6px 0 12px; }
+  .hotel-card { background:#fff; border:1px solid var(--line); border-top:2px solid var(--gold); border-radius:2px; padding:14px; margin-bottom:16px; }
+  .hotel-head { display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+  .hotel-num { font-family:Georgia,serif; color:var(--gold); font-size:16px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:2px; padding:12px; margin-bottom:18px; }
+  .list-row { display:flex; align-items:center; gap:8px; padding:4px 0; font-size:13px; flex-wrap:wrap; }
+  .list-row .grow { flex:1; min-width:160px; }
+  .list-row .meta { font-size:11px; color:var(--muted); display:block; }
+  .status-sel { width:130px; flex:none; font-size:11px; padding:4px 6px; }
+  .status-sel.status-sent, .status-sel.status-confirmed { border-color:#4a7c4a; color:#4a7c4a; }
+  .status-sel.status-ready-to-send { border-color:var(--gold); color:#8a6f3d; }
+  .status-sel.status-declined { border-color:#a33; color:#a33; }
+  .room-row { display:flex; gap:8px; margin-bottom:8px; align-items:center; }
+  .room-row .rt { flex:2; } .room-row .rn { width:74px; flex:none; } .room-row .rr { width:100px; flex:none; }
+  .room-total { font-size:12px; color:var(--muted); white-space:nowrap; min-width:84px; text-align:right; }
+  .hint { font-size:11px; color:var(--muted); margin-top:6px; }
+  .img-row { display:flex; gap:8px; margin-bottom:4px; align-items:center; }
+  .img-thumb { width:44px; height:32px; object-fit:cover; border:1px solid var(--line); background:#f4f1ec; flex:none; }
+  .img-size { width:110px; flex:none; font-size:12px; }
+  .img-warn { font-size:11px; margin:0 0 8px 52px; }
+  .img-warn.bad { color:#a33; } .img-warn.ok { color:#4a7c4a; } .img-warn.note { color:var(--muted); }
+  #loading { position:fixed; inset:0; background:#faf8f5; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:10px; z-index:9; font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); }
+  #tabbar { display:none; border-bottom:1px solid var(--line); }
+  #tabbar button { flex:1; padding:10px; border:none; background:transparent; font-size:12px; letter-spacing:1px; text-transform:uppercase; border-bottom:2px solid transparent; }
+  #tabbar button.active { background:#fff; border-bottom-color:var(--gold); }
+  @media (max-width:899px){
+    #tabbar { display:flex; }
+    #form-pane { width:100%; border-right:none; }
+    body.show-preview #form-pane { display:none; }
+    body:not(.show-preview) #preview-pane { display:none; }
+  }
+</style>
+</head>
+<body>
+<div id="loading"><img src="https://www.sedgemoretravel.com/wp-content/themes/sadgemore/assets/images/logo_dark.png" alt="Sedgemore" style="height:34px"><div>Loading proposal generator…</div></div>
+<header>
+  <img src="https://www.sedgemoretravel.com/wp-content/uploads/2023/07/Group-1.png" alt="Sedgemore" style="height:26px;display:block">
+  <div class="sub">Proposal Generator</div>
+  <div class="user" id="userBadge"></div>
+  <div class="spacer"></div>
+  <button class="btn-outline" style="border-color:var(--gold);color:var(--gold)" onclick="saveDraft()">Save draft</button>
+  <button class="btn btn-gold" onclick="copyForGmail()">Copy for Gmail</button>
+  <button class="btn-outline" onclick="copySource()">Copy HTML</button>
+  <button class="btn-outline" onclick="downloadHTML()">Download</button>
+  <button class="btn-outline" id="pdfBtn" onclick="downloadPDF()">Download PDF</button>
+</header>
+<div id="status"></div>
+<div id="tabbar">
+  <button class="active" onclick="setTab('form',this)">Edit</button>
+  <button onclick="setTab('preview',this)">Preview</button>
+</div>
+<main>
+  <div id="form-pane"></div>
+  <div id="preview-pane"><iframe id="preview" title="Proposal preview"></iframe></div>
+</main>
+
+<script>
+"use strict";
+const GOLD="#c9a96e", CHARCOAL="#1a1a1a";
+const LOGO_DARK="https://www.sedgemoretravel.com/wp-content/themes/sadgemore/assets/images/logo_dark.png";  /* black logo - white proposal background */
+const LOGO_WHITE="https://www.sedgemoretravel.com/wp-content/uploads/2023/07/Group-1.png"; /* white logo - dark app header */
+const uid=()=>Math.random().toString(36).slice(2,9);
+const esc=s=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const fmt=n=>isNaN(n)?"0":Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,",");
+const eur=n=>"EUR "+fmt(n);
+const fmtDate=iso=>{ if(!iso) return ""; const d=new Date(iso+"T12:00:00"); return isNaN(d)?iso:d.toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"}); };
+const nightsBetween=(a,b)=>{ if(!a||!b) return 0; const ms=new Date(b)-new Date(a); return ms>0?Math.round(ms/864e5):0; };
+
+/* image size presets — email-safe pixel widths */
+const IMG_SIZES={ full:{w:752,min:752,label:"Full width"}, half:{w:370,min:370,label:"Half width"}, third:{w:243,min:243,label:"One-third"} };
+const IMG_MAX_NATURAL=2400; // above this, file likely heavy for email
+
+const DEFAULT_OVERVIEW="We are delighted to present the following proposal for your group stay. Each property below has been selected for its location, service standard and suitability for your group, with rates held on a provisional basis pending confirmation.";
+const newRoom=()=>({id:uid(),type:"",rooms:"",rate:""});
+const newHotel=()=>({id:uid(),name:"",brand:"",address:"",description:"",highlight:"",images:[],rooms:[newRoom()],vat:"included",vatPct:"10",breakfast:"Included",cityTax:"EUR 12 per person per night",checkInOut:"15:00 / 12:00",notes:"",contactName:"",contactEmail:""});
+const blank=()=>({client:"",destination:"",arrival:"",departure:"",roomsPerNight:"",overview:DEFAULT_OVERVIEW,senderName:"",senderEmail:"",preparedBy:"",hotels:[newHotel()]});
+
+let P=blank(), templates=[], drafts=[], USER="";
+
+/* ---------- local Node server API ---------- */
+const apiBase=(()=>{
+  const path=window.location.pathname.replace(/\/Index\.html$/i,"").replace(/\/$/,"");
+  return path?path+"/api":"/api";
+})();
+const api=name=>async(...args)=>{
+  const response=await fetch(apiBase,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({method:name,args})});
+  const payload=await response.json();
+  if(!response.ok) throw new Error(payload.error||"Request failed");
+  return payload.result;
+};
+const srv={ getUser:api("getUser"), listDrafts:api("listDrafts"), saveDraft:api("saveDraft"), loadDraft:api("loadDraft"), deleteDraft:api("deleteDraft"), setDraftStatus:api("setDraftStatus"),
+            listTemplates:api("listTemplates"), saveTemplate:api("saveTemplate"), deleteTemplate:api("deleteTemplate"),
+            getMyDefaults:api("getMyDefaults"), saveMyDefaults:api("saveMyDefaults") };
+
+let statusTimer;
+function flash(msg){ const el=document.getElementById("status"); el.textContent=msg; el.style.display="block"; clearTimeout(statusTimer); statusTimer=setTimeout(()=>el.style.display="none",2800); }
+
+/* ---------- proposal HTML output (Gmail-safe) ---------- */
+function td(content,i,extra){ extra=extra||""; const bg=i%2?"#f9f7f4":"#ffffff"; return '<td bgcolor="'+bg+'" style="background-color:'+bg+';padding:10px 12px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:'+CHARCOAL+';border-bottom:1px solid #e8e3db;'+extra+'">'+content+'</td>'; }
+function th(t){ return '<td bgcolor="#e8e3db" style="background-color:#e8e3db;padding:10px 12px;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;color:'+CHARCOAL+';border-bottom:2px solid '+GOLD+';">'+t+'</td>'; }
+const roomTotal=(r,n)=>(parseFloat(r.rooms)||0)*(parseFloat(r.rate)||0)*n;
+const hotelTotal=(h,n)=>h.rooms.reduce((s,r)=>s+roomTotal(r,n),0);
+const vatLabel=h=>h.vat==="excluded"?" + "+esc(h.vatPct||10)+"% VAT":" (VAT incl.)";
+
+function imagesBlock(h){
+  const imgs=(h.images||[]).filter(im=>im.url && im.url.trim());
+  if(!imgs.length) return "";
+  let out="", i=0;
+  while(i<imgs.length){
+    const im=imgs[i];
+    if(im.size==="full"||!im.size){
+      out+='<tr><td style="padding:16px 0 0 0;"><img src="'+esc(im.url.trim())+'" width="752" alt="'+esc(h.name)+'" style="display:block;width:100%;max-width:752px;height:auto;border:0;"></td></tr>';
+      i++;
+    } else {
+      // collect run of same non-full size, lay out in a row
+      const size=im.size, per=size==="half"?2:3, w=IMG_SIZES[size].w;
+      const run=[];
+      while(i<imgs.length && imgs[i].size===size && run.length<per){ run.push(imgs[i]); i++; }
+      const cells=run.map((r,ix)=>'<td width="'+Math.floor(100/per)+'%" style="padding:0 '+(ix<run.length-1?'8px':'0')+' 8px 0;"><img src="'+esc(r.url.trim())+'" width="'+w+'" alt="'+esc(h.name)+'" style="display:block;width:100%;max-width:'+w+'px;height:auto;border:0;"></td>').join("");
+      out+='<tr><td style="padding:16px 0 0 0;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'+cells+'</tr></table></td></tr>';
+    }
+  }
+  return out;
+}
+
+/* At a Glance — one-look comparison of how the properties differ, built from hotel inputs */
+function atAGlance(p,nights){
+  if(p.hotels.length<2) return ""; // comparison only makes sense with 2+ properties
+  const label='<div style="font-family:Arial,Helvetica,sans-serif;font-size:9px;letter-spacing:3px;text-transform:uppercase;color:'+GOLD+';padding-bottom:8px;">At a Glance</div>';
+  const minRate=h=>{ const rates=h.rooms.map(r=>parseFloat(r.rate)).filter(n=>!isNaN(n)&&n>0); return rates.length?Math.min.apply(null,rates):null; };
+  const rows=p.hotels.map((h,i)=>{
+    const from=minRate(h);
+    return "<tr>"+
+      td('<span style="color:'+GOLD+';font-family:Georgia,serif;">'+String(i+1).padStart(2,"0")+'</span>&nbsp; <b>'+(esc(h.name)||"Hotel")+'</b>'+(h.brand?'<br><span style="color:#6b6459;">'+esc(h.brand)+'</span>':""),i)+
+      td(h.highlight?esc(h.highlight):"&mdash;",i)+
+      td(from!==null?"From "+eur(from):"&mdash;",i,"white-space:nowrap;")+
+      td(esc(h.breakfast)||"&mdash;",i)+
+      td(esc(h.cityTax)||"&mdash;",i)+
+      td(eur(hotelTotal(h,nights))+vatLabel(h),i,"white-space:nowrap;")+
+    "</tr>";
+  }).join("");
+  return '<tr><td style="padding:28px 24px 0 24px;">'+label+
+    '<table width="100%" cellpadding="0" cellspacing="0" border="0">'+
+    '<tr>'+th("Property")+th("Distinguishing Feature")+th("Rate From / Night")+th("Breakfast")+th("City Tax")+th(nights>0?nights+"-Night Total":"Total")+'</tr>'+
+    rows+'</table></td></tr>';
+}
+
+function generateHTML(){
+  const p=P, nights=nightsBetween(p.arrival,p.departure);
+  const nLabel=nights>0?nights+"-Night Total":"Total";
+  const label=t=>'<div style="font-family:Arial,Helvetica,sans-serif;font-size:9px;letter-spacing:3px;text-transform:uppercase;color:'+GOLD+';padding-bottom:8px;">'+t+'</div>';
+  const logo='<img src="'+LOGO_DARK+'" width="200" alt="Sedgemore Travel" style="display:block;width:200px;">';
+
+  const summaryRows=p.hotels.map((h,i)=>{
+    const types=h.rooms.map(r=>esc(r.type)).filter(Boolean).join(" / ")||"&mdash;";
+    const rates=h.rooms.map(r=>r.rate?eur(parseFloat(r.rate)):"").filter(Boolean).join(" / ")||"&mdash;";
+    return "<tr>"+td(esc(h.name)||"Hotel",i)+td(types,i)+td(rates,i)+td(esc(h.breakfast)||"&mdash;",i)+td(eur(hotelTotal(h,nights))+vatLabel(h),i,"white-space:nowrap;")+"</tr>";
+  }).join("");
+
+  const hotelSections=p.hotels.map((h,idx)=>{
+    const rows=h.rooms.map((r,i)=>"<tr>"+td(esc(r.type)||"&mdash;",i)+td(esc(r.rooms)||"&mdash;",i,"text-align:center;")+td(r.rate?eur(parseFloat(r.rate)):"&mdash;",i)+td(eur(roomTotal(r,nights)),i,"white-space:nowrap;")+"</tr>").join("");
+    const notes=(h.notes||"").split("\n").map(n=>n.trim()).filter(Boolean);
+    const extra=[
+      h.cityTax?"City tax: "+esc(h.cityTax):null,
+      h.checkInOut?"Check-in / check-out: "+esc(h.checkInOut):null
+    ].concat(notes.map(esc)).concat([(h.contactName||h.contactEmail)?"Hotel contact: "+[esc(h.contactName),esc(h.contactEmail)].filter(Boolean).join(", "):null]).filter(Boolean);
+    return '<tr><td style="padding:32px 0 0 0;">'+
+      '<table width="100%" cellpadding="0" cellspacing="0" border="0">'+
+        '<tr><td bgcolor="#f9f7f4" style="background-color:#f9f7f4;padding:18px 20px;">'+
+          '<table cellpadding="0" cellspacing="0" border="0"><tr>'+
+            '<td style="font-family:Georgia,\'Times New Roman\',serif;font-size:20px;color:'+GOLD+';padding-right:14px;vertical-align:top;">'+String(idx+1).padStart(2,"0")+'</td>'+
+            '<td><div style="font-family:Georgia,\'Times New Roman\',serif;font-size:20px;color:'+CHARCOAL+';">'+(esc(h.name)||"Hotel")+'</div>'+
+            '<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6b6459;padding-top:4px;">'+[esc(h.brand),esc(h.address)].filter(Boolean).join(" &middot; ")+'</div></td>'+
+          '</tr></table></td></tr>'+
+        imagesBlock(h)+
+        (h.description?'<tr><td style="padding:16px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.6;color:'+CHARCOAL+';">'+esc(h.description)+'</td></tr>':"")+
+        '<tr><td><table width="100%" cellpadding="0" cellspacing="0" border="0">'+
+          '<tr>'+th("Room Category")+th("Rooms")+th("Rate per Night")+th(nLabel)+'</tr>'+rows+
+          '<tr><td colspan="3" bgcolor="#f4f1ec" style="background-color:#f4f1ec;padding:10px 12px;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;color:'+CHARCOAL+';border-top:2px solid '+GOLD+';">Hotel total</td>'+
+          '<td bgcolor="#f4f1ec" style="background-color:#f4f1ec;padding:10px 12px;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;color:'+CHARCOAL+';border-top:2px solid '+GOLD+';white-space:nowrap;">'+eur(hotelTotal(h,nights))+vatLabel(h)+'</td></tr>'+
+        '</table></td></tr>'+
+        (extra.length?'<tr><td style="padding:14px 0 0 0;">'+extra.map(n=>'<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.7;color:'+CHARCOAL+';"><span style="color:'+GOLD+';">&ndash;</span>&nbsp; '+n+'</div>').join("")+'</td></tr>':"")+
+      '</table></td></tr>'+
+      '<tr><td style="padding:28px 0 0 0;border-bottom:1px solid #e8e3db;"></td></tr>';
+  }).join("");
+
+  return '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+(esc(p.destination)||"Sedgemore")+' Proposal &ndash; Sedgemore</title></head>'+
+  '<body style="margin:0;padding:0;background-color:#ffffff;">'+
+  '<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;"><tr><td>'+
+  '<table width="800" cellpadding="0" cellspacing="0" border="0" style="max-width:800px;margin:0;">'+
+    '<tr><td style="padding:36px 24px 24px 24px;">'+logo+'</td></tr>'+
+    '<tr><td style="padding:0 24px 24px 24px;border-bottom:2px solid '+GOLD+';">'+
+      label("Proposal")+
+      '<div style="font-family:Georgia,\'Times New Roman\',serif;font-size:26px;color:'+CHARCOAL+';padding-bottom:10px;">'+(esc(p.destination)||"Destination")+'</div>'+
+      '<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:'+CHARCOAL+';line-height:1.7;">'+
+        fmtDate(p.arrival)+(p.departure?" &ndash; "+fmtDate(p.departure):"")+(nights?" &nbsp;&middot;&nbsp; "+nights+" nights":"")+(p.roomsPerNight?" &nbsp;&middot;&nbsp; "+esc(p.roomsPerNight)+" rooms per night":"")+"<br>"+
+        (p.client?"Prepared for "+esc(p.client):"")+
+      '</div></td></tr>'+
+    '<tr><td style="padding:28px 24px 0 24px;">'+label("Overview")+'<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.7;color:'+CHARCOAL+';">'+esc(p.overview)+'</div></td></tr>'+
+    atAGlance(p,nights)+
+    '<tr><td style="padding:28px 24px 0 24px;"><table width="100%" cellpadding="0" cellspacing="0" border="0">'+
+      '<tr>'+["Arrival","Departure","Rooms per Night"].map(t=>'<td bgcolor="#e8e3db" width="33%" style="background-color:#e8e3db;padding:10px 12px;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;color:'+CHARCOAL+';border-bottom:2px solid '+GOLD+';">'+t+'</td>').join("")+'</tr>'+
+      '<tr>'+
+        '<td style="padding:10px 12px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:'+CHARCOAL+';border-bottom:1px solid #e8e3db;">'+(fmtDate(p.arrival)||"&mdash;")+'</td>'+
+        '<td style="padding:10px 12px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:'+CHARCOAL+';border-bottom:1px solid #e8e3db;">'+(fmtDate(p.departure)||"&mdash;")+'</td>'+
+        '<td style="padding:10px 12px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:'+CHARCOAL+';border-bottom:1px solid #e8e3db;">'+(esc(p.roomsPerNight)||"&mdash;")+'</td>'+
+      '</tr></table></td></tr>'+
+    '<tr><td style="padding:32px 24px 0 24px;">'+label("Rate Summary")+
+      '<table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'+th("Property")+th("Room Type")+th("Rate per Night")+th("Breakfast")+th(nLabel)+'</tr>'+summaryRows+'</table></td></tr>'+
+    '<tr><td style="padding:0 24px;"><table width="100%" cellpadding="0" cellspacing="0" border="0">'+hotelSections+'</table></td></tr>'+
+    '<tr><td style="padding:32px 24px 48px 24px;">'+
+      '<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.7;color:'+CHARCOAL+';padding-bottom:16px;">We would be delighted to discuss this proposal further and hold space at your preferred property. Rates are subject to availability at the time of confirmation.</div>'+
+      '<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:'+CHARCOAL+';">'+esc(p.senderName)+(p.senderEmail?' &nbsp;&middot;&nbsp; <a href="mailto:'+esc(p.senderEmail)+'" style="color:'+GOLD+';text-decoration:none;">'+esc(p.senderEmail)+'</a>':"")+'</div>'+
+      '<div style="font-family:Arial,Helvetica,sans-serif;font-size:9px;letter-spacing:3px;text-transform:uppercase;color:'+GOLD+';padding-top:14px;">Sedgemore Travel</div>'+
+    '</td></tr></table></td></tr></table></body></html>';
+}
+
+function updatePreview(){ document.getElementById("preview").srcdoc=generateHTML(); }
+
+/* ---------- form rendering ---------- */
+const $=s=>document.querySelector(s);
+function h(html){ const t=document.createElement("template"); t.innerHTML=html.trim(); return t.content.firstChild; }
+function bindInput(el,setter){ el.addEventListener("input",e=>{ setter(e.target.value); updatePreview(); }); }
+
+function renderForm(){
+  const pane=$("#form-pane"); pane.innerHTML="";
+  const nights=nightsBetween(P.arrival,P.departure);
+
+  if(drafts.length){
+    const card=h('<div class="card"><label class="f">Team proposals (shared)</label></div>');
+    drafts.slice().reverse().forEach(d=>{
+      const created=d.createdAt?new Date(d.createdAt).toLocaleDateString("en-GB",{day:"numeric",month:"short"}):"";
+      const edited=d.lastEditedAt?new Date(d.lastEditedAt).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):"";
+      const meta='Created by '+esc(d.createdBy||"?")+(created?" \u00b7 "+created:"")+(d.lastEditedBy&&d.lastEditedBy!==d.createdBy?" \u2014 last edited by "+esc(d.lastEditedBy):"")+(edited?" \u00b7 "+edited:"");
+      const row=h('<div class="list-row"><span class="grow">'+esc(d.name)+'<span class="meta">'+meta+'</span></span></div>');
+      const st=h('<select class="status-sel status-'+esc((d.status||"Draft").toLowerCase().replace(/\s+/g,"-"))+'">'+["Draft","Ready to send","Sent","Confirmed","Declined"].map(x=>'<option'+(x===(d.status||"Draft")?" selected":"")+'>'+x+'</option>').join("")+'</select>');
+      st.addEventListener("change",async e=>{ try{ drafts=await srv.setDraftStatus(d.key,e.target.value); renderForm(); flash('Status updated to "'+e.target.value+'"'); }catch(err){ flash("Could not update status"); } });
+      const open=h('<button class="btn-tiny">Open</button>'); open.onclick=()=>openDraft(d.key);
+      const del=h('<button class="btn-tiny btn-danger">Delete</button>'); del.onclick=()=>removeDraft(d.key);
+      row.append(st,open,del); card.append(row);
+    });
+    card.append(h('<div class="hint">Status, creator and edit history are also visible in the \u201CSedgemore Proposal Generator \u2014 Data\u201D Google Sheet.</div>'));
+    pane.append(card);
+  }
+
+  pane.append(h('<div class="section-label">Proposal details</div>'));
+  const field=(labelText,inputEl)=>{ const f=h('<div class="field"></div>'); f.append(h('<label class="f">'+labelText+'</label>'),inputEl); return f; };
+  const txt=(val,setter,ph)=>{ const el=h('<input>'); el.value=val; el.placeholder=ph||""; bindInput(el,setter); return el; };
+
+  pane.append(field("Client / Prepared for *",txt(P.client,v=>P.client=v,"e.g. Meridian Capital Partners")));
+  pane.append(field("Destination *",txt(P.destination,v=>P.destination=v,"e.g. Milan")));
+
+  const row1=h('<div class="row"></div>');
+  const arr=h('<input type="date">'); arr.value=P.arrival; arr.addEventListener("input",e=>{P.arrival=e.target.value; renderForm(); updatePreview();});
+  const dep=h('<input type="date">'); dep.value=P.departure; dep.addEventListener("input",e=>{P.departure=e.target.value; renderForm(); updatePreview();});
+  const rpn=h('<input type="number" min="1">'); rpn.value=P.roomsPerNight; bindInput(rpn,v=>P.roomsPerNight=v);
+  row1.append(field("Arrival *",arr),field("Departure *",dep),field("Rooms / night *",rpn));
+  pane.append(row1);
+  if(nights>0) pane.append(h('<div class="hint" style="margin:-6px 0 12px">'+nights+' nights &mdash; totals calculated automatically</div>'));
+
+  const ov=h('<textarea style="min-height:80px"></textarea>'); ov.value=P.overview; bindInput(ov,v=>P.overview=v);
+  pane.append(field("Overview paragraph",ov));
+
+  const row2=h('<div class="row"></div>');
+  row2.append(field("Sender name",txt(P.senderName,v=>P.senderName=v)),field("Sender email",txt(P.senderEmail,v=>P.senderEmail=v)));
+  pane.append(row2);
+
+  const senderBtns=h('<div class="row" style="margin-bottom:20px"></div>');
+  const saveS=h('<button class="btn-ghost">Save sender as my default</button>');
+  saveS.onclick=async()=>{ try{ await srv.saveMyDefaults(JSON.stringify({name:P.senderName,email:P.senderEmail})); flash("Sender details saved as your default"); }catch(e){ flash("Could not save default"); } };
+  senderBtns.append(saveS);
+  pane.append(senderBtns);
+
+  P.hotels.forEach((ht,i)=>pane.append(hotelCard(ht,i,nights)));
+
+  const addBtn=h('<button class="btn" style="width:100%">+ Add hotel ('+P.hotels.length+'/10)</button>');
+  addBtn.disabled=P.hotels.length>=10;
+  addBtn.onclick=()=>{ P.hotels.push(newHotel()); renderForm(); updatePreview(); };
+  pane.append(addBtn);
+
+  if(templates.length){
+    const card=h('<div class="card" style="margin-top:20px"><label class="f">Team hotel templates (shared)</label></div>');
+    templates.forEach(t=>{
+      const row=h('<div class="list-row"><span class="grow">'+esc(t.name)+'</span></div>');
+      const del=h('<button class="btn-tiny btn-danger">Delete</button>');
+      del.onclick=async()=>{ try{ templates=await srv.deleteTemplate(t.name); renderForm(); flash("Template deleted"); }catch(e){ flash("Could not delete template"); } };
+      row.append(del); card.append(row);
+    });
+    card.append(h('<div class="hint">Templates and drafts are shared with everyone at Sedgemore who uses this app.</div>'));
+    pane.append(card);
+  }
+  pane.append(h('<div style="height:40px"></div>'));
+}
+
+function imgWarnEl(){ return h('<div class="img-warn note"></div>'); }
+function checkImage(im,warn){
+  if(!im.url||!im.url.trim()){ warn.textContent=""; return; }
+  const probe=new Image();
+  probe.onload=()=>{
+    const need=IMG_SIZES[im.size||"full"].min*2; /* 2x for retina sharpness */
+    const soft=IMG_SIZES[im.size||"full"].min;
+    if(probe.naturalWidth<soft){ warn.className="img-warn bad"; warn.textContent="Too small: "+probe.naturalWidth+"px wide — needs at least "+soft+"px for "+IMG_SIZES[im.size||"full"].label.toLowerCase()+" (ideally "+need+"px)."; }
+    else if(probe.naturalWidth<need){ warn.className="img-warn note"; warn.textContent="Usable: "+probe.naturalWidth+"px wide. For crisp retina display, "+need+"px+ is ideal."; }
+    else if(probe.naturalWidth>IMG_MAX_NATURAL){ warn.className="img-warn note"; warn.textContent="Very large ("+probe.naturalWidth+"px) — fine, but a resized copy would make the email lighter."; }
+    else { warn.className="img-warn ok"; warn.textContent="Good size: "+probe.naturalWidth+"×"+probe.naturalHeight+"px."; }
+  };
+  probe.onerror=()=>{ warn.className="img-warn bad"; warn.textContent="Couldn't load this URL — make sure it's a direct image link (ends in .jpg/.png/.webp)."; };
+  probe.src=im.url.trim();
+}
+
+function hotelCard(ht,i,nights){
+  const card=h('<div class="hotel-card"></div>');
+  const head=h('<div class="hotel-head"><span class="hotel-num">'+String(i+1).padStart(2,"0")+'</span><span style="font-size:12px;letter-spacing:1px;text-transform:uppercase;flex:1">Hotel</span></div>');
+  if(templates.length){
+    const sel=h('<select style="width:auto;font-size:12px"><option value="">Insert template…</option>'+templates.map(t=>'<option value="'+esc(t.name)+'">'+esc(t.name)+'</option>').join("")+'</select>');
+    sel.addEventListener("change",e=>{
+      const t=templates.find(x=>x.name===e.target.value); if(!t) return;
+      try{
+        const copy=JSON.parse(t.json); copy.id=ht.id; copy.images=copy.images||[];
+        copy.rooms=(copy.rooms||[newRoom()]).map(r=>Object.assign({},r,{id:uid()}));
+        P.hotels[i]=copy; renderForm(); updatePreview();
+      }catch(err){ flash("Template data could not be read"); }
+    });
+    head.append(sel);
+  }
+  const up=h('<button class="btn-tiny">↑</button>'); up.disabled=i===0; up.onclick=()=>{const a=P.hotels;[a[i-1],a[i]]=[a[i],a[i-1]]; renderForm(); updatePreview();};
+  const dn=h('<button class="btn-tiny">↓</button>'); dn.disabled=i===P.hotels.length-1; dn.onclick=()=>{const a=P.hotels;[a[i+1],a[i]]=[a[i],a[i+1]]; renderForm(); updatePreview();};
+  const rm=h('<button class="btn-tiny btn-danger">Remove</button>'); rm.disabled=P.hotels.length===1; rm.onclick=()=>{P.hotels.splice(i,1); renderForm(); updatePreview();};
+  head.append(up,dn,rm); card.append(head);
+
+  const field=(l,el)=>{ const f=h('<div class="field"></div>'); f.append(h('<label class="f">'+l+'</label>'),el); return f; };
+  const txt=(val,setter,ph)=>{ const el=h('<input>'); el.value=val; el.placeholder=ph||""; bindInput(el,setter); return el; };
+
+  card.append(field("Hotel name *",txt(ht.name,v=>ht.name=v,"e.g. Four Seasons Hotel Milano")));
+  const r1=h('<div class="row"></div>');
+  r1.append(field("Brand / group",txt(ht.brand,v=>ht.brand=v,"e.g. Rocco Forte Hotels")),field("Address",txt(ht.address,v=>ht.address=v)));
+  card.append(r1);
+  const desc=h('<textarea placeholder="2–3 sentence property description"></textarea>'); desc.value=ht.description; bindInput(desc,v=>ht.description=v);
+  card.append(field("Description *",desc));
+  card.append(field('Distinguishing feature <span style="text-transform:none;letter-spacing:0">(one line — appears in the At a Glance comparison)</span>',txt(ht.highlight||"",v=>ht.highlight=v,"e.g. Rooftop terrace, closest to the Duomo")));
+
+  /* image URLs with size control + dimension check */
+  card.append(h('<label class="f">Hotel images</label>'));
+  ht.images=ht.images||[];
+  ht.images.forEach((im,ix)=>{
+    if(typeof im==="string"){ im={url:im,size:"full"}; ht.images[ix]=im; }
+    const row=h('<div class="img-row"></div>');
+    const thumb=h('<img class="img-thumb" alt="">'); if(im.url&&im.url.trim()) thumb.src=im.url.trim();
+    thumb.onerror=()=>thumb.removeAttribute("src");
+    const inp=h('<input placeholder="https://…/image.jpg">'); inp.value=im.url||"";
+    const sizeSel=h('<select class="img-size"><option value="full">Full width</option><option value="half">Half width</option><option value="third">One-third</option></select>');
+    sizeSel.value=im.size||"full";
+    const warn=imgWarnEl();
+    inp.addEventListener("input",e=>{ im.url=e.target.value; if(im.url.trim()) thumb.src=im.url.trim(); checkImage(im,warn); updatePreview(); });
+    sizeSel.addEventListener("change",e=>{ im.size=e.target.value; checkImage(im,warn); updatePreview(); });
+    const del=h('<button class="btn-tiny btn-danger">×</button>'); del.onclick=()=>{ ht.images.splice(ix,1); renderForm(); updatePreview(); };
+    row.append(thumb,inp,sizeSel,del);
+    card.append(row); card.append(warn);
+    checkImage(im,warn);
+  });
+  const addImg=h('<button class="btn-ghost" style="margin-bottom:12px">+ Add image URL</button>');
+  addImg.onclick=()=>{ ht.images.push({url:"",size:"full"}); renderForm(); };
+  card.append(addImg);
+  card.append(h('<div class="hint" style="margin:-6px 0 12px">Paste direct image links (right-click a photo &rarr; \u201CCopy image address\u201D). Full width renders at 752px, half at 370px, one-third at 243px \u2014 the size check below each link tells you if the source is big enough. Check brand usage rights before including portal assets.</div>'));
+
+  card.append(h('<label class="f">Room categories</label>'));
+  ht.rooms.forEach(r=>{
+    const row=h('<div class="room-row"></div>');
+    const t=h('<input class="rt" placeholder="Room category / type *">'); t.value=r.type; bindInput(t,v=>r.type=v);
+    const n=h('<input class="rn" type="number" min="0" placeholder="Rooms">'); n.value=r.rooms;
+    const rt=h('<input class="rr" type="number" min="0" placeholder="EUR/night">'); rt.value=r.rate;
+    const tot=h('<span class="room-total">'+eur(roomTotal(r,nights))+'</span>');
+    n.addEventListener("input",e=>{ r.rooms=e.target.value; tot.textContent=eur(roomTotal(r,nights)); updatePreview(); });
+    rt.addEventListener("input",e=>{ r.rate=e.target.value; tot.textContent=eur(roomTotal(r,nights)); updatePreview(); });
+    const del=h('<button class="btn-tiny btn-danger">×</button>'); del.disabled=ht.rooms.length===1;
+    del.onclick=()=>{ ht.rooms=ht.rooms.filter(x=>x.id!==r.id); renderForm(); updatePreview(); };
+    row.append(t,n,rt,tot,del); card.append(row);
+  });
+  const addRoom=h('<button class="btn-ghost" style="margin-bottom:12px">+ Add room type</button>');
+  addRoom.onclick=()=>{ ht.rooms.push(newRoom()); renderForm(); };
+  card.append(addRoom);
+
+  const r2=h('<div class="row"></div>');
+  const vatSel=h('<select><option value="included">Included</option><option value="excluded">Excluded</option></select>');
+  vatSel.value=ht.vat; vatSel.addEventListener("change",e=>{ ht.vat=e.target.value; renderForm(); updatePreview(); });
+  const vatF=(()=>{const f=h('<div class="field" style="flex:none;width:130px"></div>'); f.append(h('<label class="f">VAT *</label>'),vatSel); return f;})();
+  r2.append(vatF);
+  if(ht.vat==="excluded"){
+    const pct=h('<input type="number">'); pct.value=ht.vatPct; bindInput(pct,v=>ht.vatPct=v);
+    const pf=h('<div class="field" style="flex:none;width:80px"></div>'); pf.append(h('<label class="f">VAT %</label>'),pct); r2.append(pf);
+  }
+  r2.append(field("Breakfast *",txt(ht.breakfast,v=>ht.breakfast=v,'"Included" or e.g. "EUR 52 pp"')));
+  card.append(r2);
+
+  const r3=h('<div class="row"></div>');
+  r3.append(field("City tax note",txt(ht.cityTax,v=>ht.cityTax=v)));
+  const cio=h('<div class="field" style="flex:none;width:150px"></div>'); cio.append(h('<label class="f">Check-in / check-out</label>'),txt(ht.checkInOut,v=>ht.checkInOut=v)); r3.append(cio);
+  card.append(r3);
+
+  const notes=h('<textarea placeholder="Spa access included&#10;Porterage EUR 8 per person"></textarea>');
+  notes.value=ht.notes; bindInput(notes,v=>ht.notes=v);
+  card.append(field("Additional notes (one per line)",notes));
+
+  const r4=h('<div class="row"></div>');
+  r4.append(field("Hotel contact name",txt(ht.contactName,v=>ht.contactName=v)),field("Hotel contact email",txt(ht.contactEmail,v=>ht.contactEmail=v)));
+  card.append(r4);
+
+  const foot=h('<div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;flex-wrap:wrap;gap:8px"></div>');
+  const saveT=h('<button class="btn-ghost">Save as team template</button>');
+  saveT.onclick=async()=>{
+    if(!ht.name){ flash("Add a hotel name before saving as template"); return; }
+    try{ templates=await srv.saveTemplate(ht.name,JSON.stringify(ht)); renderForm(); flash('"'+ht.name+'" saved as a shared team template'); }
+    catch(e){ flash("Could not save template"); }
+  };
+  foot.append(saveT,h('<span style="font-size:12px">Hotel total: <b>'+eur(hotelTotal(ht,nights))+vatLabel(ht)+'</b></span>'));
+  card.append(foot);
+  return card;
+}
+
+/* ---------- actions ---------- */
+async function saveDraft(){
+  const name=(P.destination||"Untitled")+" – "+(P.client||"No client");
+  const key="draft_"+name.replace(/\W+/g,"_").slice(0,120);
+  P.preparedBy=USER;
+  try{ drafts=await srv.saveDraft(key,name,JSON.stringify(P)); renderForm(); flash("Saved: "+name); }
+  catch(e){ flash("Could not save draft — "+(e.message||"server request failed")); }
+}
+async function openDraft(key){
+  try{
+    const json=await srv.loadDraft(key);
+    if(!json){ flash("Draft not found"); return; }
+    P=JSON.parse(json);
+    P.hotels.forEach(x=>{ x.images=(x.images||[]).map(im=>typeof im==="string"?{url:im,size:"full"}:im); });
+    renderForm(); updatePreview(); flash("Draft loaded");
+  }catch(e){ flash("Could not load draft"); }
+}
+async function removeDraft(key){
+  try{ drafts=await srv.deleteDraft(key); renderForm(); flash("Draft deleted"); }
+  catch(e){ flash("Could not delete draft"); }
+}
+async function copyForGmail(){
+  const html=generateHTML();
+  try{
+    await navigator.clipboard.write([new ClipboardItem({
+      "text/html":new Blob([html],{type:"text/html"}),
+      "text/plain":new Blob([html],{type:"text/plain"})
+    })]);
+    flash("Copied — paste directly into Gmail compose");
+  }catch(e){
+    try{ await navigator.clipboard.writeText(html); flash("Copied HTML source"); }
+    catch(e2){ flash("Copy failed — use Download instead"); }
+  }
+}
+async function copySource(){ try{ await navigator.clipboard.writeText(generateHTML()); flash("HTML source copied"); }catch(e){ flash("Copy failed — use Download instead"); } }
+function downloadHTML(){
+  const blob=new Blob([generateHTML()],{type:"text/html"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=((P.destination||"proposal").toLowerCase().replace(/\s+/g,"-"))+"-proposal.html";
+  a.click(); URL.revokeObjectURL(a.href);
+}
+async function downloadPDF(){
+  const btn=document.getElementById("pdfBtn");
+  btn.disabled=true; btn.textContent="Opening print view…";
+  const w=window.open("","_blank");
+  if(w){ w.document.write(generateHTML()); w.document.close(); setTimeout(()=>w.print(),600); flash("Opened print view — choose ‘Save as PDF’ as the destination"); }
+  else flash("Pop-up blocked — allow pop-ups and try again");
+  btn.disabled=false; btn.textContent="Download PDF";
+}
+function setTab(t,btn){
+  document.body.classList.toggle("show-preview",t==="preview");
+  document.querySelectorAll("#tabbar button").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+}
+
+/* ---------- init ---------- */
+(async function init(){
+  try{
+    const [user,defs,tpls,drs]=await Promise.all([srv.getUser(),srv.getMyDefaults(),srv.listTemplates(),srv.listDrafts()]);
+    USER=user||"";
+    document.getElementById("userBadge").textContent=USER?("Signed in as "+USER):"";
+    if(defs){ try{ const d=JSON.parse(defs); P.senderName=d.name||""; P.senderEmail=d.email||""; }catch(e){} }
+    if(!P.senderEmail && USER) P.senderEmail=USER;
+    templates=tpls||[]; drafts=drs||[];
+  }catch(e){ flash("Loaded in offline mode — saving is unavailable"); }
+  document.getElementById("loading").remove();
+  renderForm(); updatePreview();
+})();
+</script>
+</body>
+</html>
