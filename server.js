@@ -19,6 +19,7 @@ const port = Number(process.env.PORT || 3000);
 const root = __dirname;
 const dataDir = path.join(root, ".data");
 const dataFile = path.join(dataDir, "proposal-data.json");
+const uploadsDir = path.join(dataDir, "hotel-images");
 
 function emptyData() { return { drafts: [], templates: [], settings: {} }; }
 function readData() {
@@ -61,6 +62,22 @@ function send(response, status, value, contentType = "application/json; charset=
   response.writeHead(status, { "Content-Type": contentType, "Cache-Control": "no-store" });
   response.end(contentType.startsWith("application/json") ? JSON.stringify(value) : value);
 }
+function serveImage(response, filename) {
+  const match = filename.match(/^([a-f0-9-]+)\.(jpg|png|webp|gif)$/i);
+  if (!match) return send(response, 404, { error: "Not found" });
+  const file = path.join(uploadsDir, filename);
+  if (!fs.existsSync(file)) return send(response, 404, { error: "Not found" });
+  const contentType = { jpg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif" }[match[2].toLowerCase()];
+  response.writeHead(200, { "Content-Type": contentType, "Cache-Control": "public, max-age=31536000, immutable" });
+  response.end(fs.readFileSync(file));
+}
+function imageUrl(request, filename) {
+  const requestUrl = new URL(request.url, `http://${request.headers.host}`);
+  const prefix = requestUrl.pathname.replace(/\/api$/, "").replace(/\/$/, "");
+  const forwardedProto = String(request.headers["x-forwarded-proto"] || "").split(",")[0].trim();
+  const protocol = forwardedProto || (request.socket.encrypted ? "https" : "http");
+  return `${protocol}://${request.headers.host}${prefix}/proposal-images/${filename}`;
+}
 function listDrafts(data) {
   return data.drafts.map(({ json, ...draft }) => draft);
 }
@@ -98,19 +115,37 @@ function call(method, args, request) {
     case "deleteTemplate": data.templates = data.templates.filter(item => item.name !== args[0]); writeData(data); return data.templates.map(({ name, json }) => ({ name, json }));
     case "getMyDefaults": return data.settings[user] || null;
     case "saveMyDefaults": data.settings[user] = String(args[0] || ""); writeData(data); return true;
+    case "uploadImage": {
+      const [dataUrl] = args;
+      const image = String(dataUrl || "").match(/^data:image\/(jpeg|png|webp|gif);base64,([a-zA-Z0-9+/=\s]+)$/);
+      if (!image) throw new Error("Please upload a valid JPG, PNG, WebP, or GIF image");
+      const bytes = Buffer.from(image[2], "base64");
+      if (!bytes.length || bytes.length > 2 * 1024 * 1024) throw new Error("Image must be smaller than 2 MB");
+      const extension = image[1] === "jpeg" ? "jpg" : image[1];
+      const filename = `${crypto.randomUUID()}.${extension}`;
+      fs.mkdirSync(uploadsDir, { recursive: true });
+      fs.writeFileSync(path.join(uploadsDir, filename), bytes, { flag: "wx" });
+      return imageUrl(request, filename);
+    }
     default: throw new Error("Unknown API method");
   }
 }
 
 const server = http.createServer((request, response) => {
-  if (!authenticate(request, response)) return;
   const url = new URL(request.url, `http://${request.headers.host}`);
+  const publicImage = url.pathname.match(/(?:^|\/)proposal-images\/([a-f0-9-]+\.(?:jpg|png|webp|gif))$/i);
+  // Images must be reachable by email clients, which cannot supply the app's
+  // Basic Auth credentials. Their opaque, random URLs are otherwise unlisted.
+  if (request.method === "GET" && publicImage) return serveImage(response, publicImage[1]);
+  if (!authenticate(request, response)) return;
   if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/Index.html" || !url.pathname.includes("."))) {
     return send(response, 200, fs.readFileSync(path.join(root, "Index.html"), "utf8"), "text/html; charset=utf-8");
   }
   if (request.method === "POST" && (url.pathname === "/api" || url.pathname.endsWith("/api"))) {
     let body = "";
-    request.on("data", chunk => { body += chunk; if (body.length > 1_000_000) request.destroy(); });
+    // Uploaded hotel images are embedded in saved draft JSON. Keep a bounded but
+    // practical ceiling for a proposal containing up to ten 2 MB images.
+    request.on("data", chunk => { body += chunk; if (body.length > 30_000_000) request.destroy(); });
     return request.on("end", () => {
       try { const { method, args = [] } = JSON.parse(body); send(response, 200, { result: call(method, args, request) }); }
       catch (error) { send(response, 400, { error: error.message || "Request failed" }); }
