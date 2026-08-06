@@ -79,7 +79,11 @@ function imageUrl(request, filename) {
   return `${protocol}://${request.headers.host}${prefix}/proposal-images/${filename}`;
 }
 function listDrafts(data) {
-  return data.drafts.map(({ json, ...draft }) => draft);
+  return data.drafts.map(({ json, ...draft }) => {
+    let proposalType = "group";
+    try { proposalType = JSON.parse(json).proposalType === "leisure" ? "leisure" : "group"; } catch (error) { /* old or malformed draft */ }
+    return { ...draft, proposalType };
+  });
 }
 
 function call(method, args, request) {

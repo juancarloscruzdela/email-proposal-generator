@@ -60,6 +60,22 @@
   #tabbar { display:none; border-bottom:1px solid var(--line); }
   #tabbar button { flex:1; padding:10px; border:none; background:transparent; font-size:12px; letter-spacing:1px; text-transform:uppercase; border-bottom:2px solid transparent; }
   #tabbar button.active { background:#fff; border-bottom-color:var(--gold); }
+  #dashboard-pane { display:none; flex:1; overflow-y:auto; padding:32px 40px; }
+  .dash-hero { display:flex; gap:16px; margin-bottom:32px; flex-wrap:wrap; }
+  .dash-hero button { flex:1; min-width:220px; padding:22px; font-size:14px; letter-spacing:1.5px; }
+  .dash-hero .type-group { background:var(--charcoal); border-color:var(--charcoal); color:#faf8f5; }
+  .dash-hero .type-leisure { background:var(--gold); border-color:var(--gold); color:var(--charcoal); }
+  .dash-section { max-width:900px; margin-bottom:36px; }
+  .dash-filters { display:flex; gap:10px; margin-bottom:14px; }
+  .dash-filters select { max-width:180px; } .dash-filters input { flex:1; }
+  .type-badge { font-size:10px; letter-spacing:1px; text-transform:uppercase; padding:2px 7px; border-radius:2px; flex:none; }
+  .type-badge.group { background:var(--charcoal); color:#faf8f5; }
+  .type-badge.leisure { background:var(--gold); color:var(--charcoal); }
+  .empty-note { font-size:12px; color:var(--muted); padding:10px 0; }
+  body.view-dashboard #editor-actions, body.view-dashboard #backBtn, body.view-dashboard #tabbar { display:none !important; }
+  body.view-dashboard #form-pane, body.view-dashboard #preview-pane { display:none; }
+  body.view-dashboard main { display:block; overflow-y:auto; }
+  body.view-dashboard #dashboard-pane { display:block; }
   @media (max-width:899px){
     #tabbar { display:flex; }
     #form-pane { width:100%; border-right:none; }
@@ -68,18 +84,21 @@
   }
 </style>
 </head>
-<body>
+<body class="view-dashboard">
 <div id="loading"><img src="https://www.sedgemoretravel.com/wp-content/themes/sadgemore/assets/images/logo_dark.png" alt="Sedgemore" style="height:34px"><div>Loading proposal generator…</div></div>
 <header>
   <img src="https://www.sedgemoretravel.com/wp-content/uploads/2023/07/Group-1.png" alt="Sedgemore" style="height:26px;display:block">
   <div class="sub">Proposal Generator</div>
   <div class="user" id="userBadge"></div>
   <div class="spacer"></div>
-  <button class="btn-outline" style="border-color:var(--gold);color:var(--gold)" onclick="saveDraft()">Save draft</button>
-  <button class="btn btn-gold" onclick="copyForGmail()">Copy for Gmail</button>
-  <button class="btn-outline" onclick="copySource()">Copy HTML</button>
-  <button class="btn-outline" onclick="downloadHTML()">Download</button>
-  <button class="btn-outline" id="pdfBtn" onclick="downloadPDF()">Download PDF</button>
+  <button class="btn-outline" id="backBtn" onclick="goDashboard()">← Dashboard</button>
+  <span id="editor-actions">
+    <button class="btn-outline" style="border-color:var(--gold);color:var(--gold)" onclick="saveDraft()">Save draft</button>
+    <button class="btn btn-gold" onclick="copyForGmail()">Copy for Gmail</button>
+    <button class="btn-outline" onclick="copySource()">Copy HTML</button>
+    <button class="btn-outline" onclick="downloadHTML()">Download</button>
+    <button class="btn-outline" id="pdfBtn" onclick="downloadPDF()">Download PDF</button>
+  </span>
 </header>
 <div id="status"></div>
 <div id="tabbar">
@@ -87,6 +106,24 @@
   <button onclick="setTab('preview',this)">Preview</button>
 </div>
 <main>
+  <div id="dashboard-pane">
+    <div class="dash-hero">
+      <button class="type-group" onclick="newProposal('group')">+ New Group Proposal</button>
+      <button class="type-leisure" onclick="newProposal('leisure')">+ New Leisure Proposal</button>
+    </div>
+    <div class="dash-section">
+      <div class="section-label">Team proposals</div>
+      <div class="dash-filters">
+        <select id="dashStatusFilter" onchange="renderDashboard()"><option value="">All statuses</option><option>Draft</option><option>Ready to send</option><option>Sent</option><option>Confirmed</option><option>Declined</option></select>
+        <input id="dashSearch" placeholder="Search client or destination…" oninput="renderDashboard()">
+      </div>
+      <div id="dashDraftsList"></div>
+    </div>
+    <div class="dash-section">
+      <div class="section-label">Hotel templates (shared)</div>
+      <div id="dashTemplatesList"></div>
+    </div>
+  </div>
   <div id="form-pane"></div>
   <div id="preview-pane"><iframe id="preview" title="Proposal preview"></iframe></div>
 </main>
@@ -110,10 +147,10 @@ const IMG_MAX_NATURAL=2400; // above this, file likely heavy for email
 
 const DEFAULT_OVERVIEW="We are delighted to present the following proposal for your group stay. Each property below has been selected for its location, service standard and suitability for your group, with rates held on a provisional basis pending confirmation.";
 const newRoom=()=>({id:uid(),type:"",rooms:"",rate:""});
-const newHotel=()=>({id:uid(),name:"",brand:"",address:"",description:"",highlight:"",images:[],rooms:[newRoom()],vat:"included",vatPct:"10",breakfast:"Included",cityTax:"EUR 12 per person per night",checkIn:"15:00",checkOut:"12:00",notes:"",contactName:"",contactEmail:""});
-const blank=()=>({client:"",destination:"",currency:"EUR",arrival:"",departure:"",roomsPerNight:"",overview:DEFAULT_OVERVIEW,senderName:"",senderEmail:"",preparedBy:"",hotels:[newHotel()]});
+const newHotel=()=>({id:uid(),name:"",brand:"",address:"",description:"",highlight:"",images:[],rooms:[newRoom()],vat:"included",vatPct:"10",breakfast:"Included",cityTax:"EUR 12 per person per night",meetingRoom:"",meetingRoomPrice:"",fbMinimum:"",checkIn:"15:00",checkOut:"12:00",notes:"",contactName:"",contactEmail:""});
+const blank=type=>({proposalType:type||"group",client:"",destination:"",currency:"EUR",arrival:"",departure:"",roomsPerNight:"",meetingPax:"",adults:"",children:"",overview:DEFAULT_OVERVIEW,senderName:"",senderEmail:"",preparedBy:"",hotels:[newHotel()]});
 
-let P=blank(), templates=[], drafts=[], USER="";
+let P=blank("group"), templates=[], drafts=[], USER="";
 
 /* ---------- local Node server API ---------- */
 const apiBase=(()=>{
@@ -156,7 +193,9 @@ function normalizeHotel(h){
   return h;
 }
 function normalizeProposal(p){
+  p.proposalType=p.proposalType==="leisure"?"leisure":"group";
   p.currency=CURRENCIES[p.currency]?p.currency:"EUR";
+  p.meetingPax=p.meetingPax||""; p.adults=p.adults||""; p.children=p.children||"";
   p.hotels=(p.hotels&&p.hotels.length?p.hotels:[newHotel()]).map(normalizeHotel);
   return p;
 }
@@ -185,10 +224,18 @@ function imagesBlock(h){
 /* At a Glance — one-look comparison of how the properties differ, built from hotel inputs */
 function atAGlance(p,nights){
   if(p.hotels.length<2) return ""; // comparison only makes sense with 2+ properties
+  const isGroup=p.proposalType!=="leisure";
   const label='<div style="font-family:Arial,Helvetica,sans-serif;font-size:9px;letter-spacing:3px;text-transform:uppercase;color:'+GOLD+';padding-bottom:8px;">At a Glance</div>';
   const minRate=h=>{ const rates=h.rooms.map(r=>parseFloat(r.rate)).filter(n=>!isNaN(n)&&n>0); return rates.length?Math.min.apply(null,rates):null; };
   const rows=p.hotels.map((h,i)=>{
     const from=minRate(h);
+    const common=td('<span style="color:'+GOLD+';font-family:Georgia,serif;">'+String(i+1).padStart(2,"0")+'</span>&nbsp; <b>'+(esc(h.name)||"Hotel")+'</b>'+(h.brand?'<br><span style="color:#6b6459;">'+esc(h.brand)+'</span>':""),i)+
+      td(from!==null?"From "+money(from,p.currency):"&mdash;",i,"white-space:nowrap;");
+    if(isGroup) return "<tr>"+common+
+      td(h.highlight?esc(h.highlight):"&mdash;",i)+
+      td(esc(h.meetingRoom)||"&mdash;",i)+
+      td(esc(h.fbMinimum)||"&mdash;",i)+
+    "</tr>";
     return "<tr>"+
       td('<span style="color:'+GOLD+';font-family:Georgia,serif;">'+String(i+1).padStart(2,"0")+'</span>&nbsp; <b>'+(esc(h.name)||"Hotel")+'</b>'+(h.brand?'<br><span style="color:#6b6459;">'+esc(h.brand)+'</span>':""),i)+
       td(h.highlight?esc(h.highlight):"&mdash;",i)+
@@ -200,12 +247,14 @@ function atAGlance(p,nights){
   }).join("");
   return '<tr><td style="padding:28px 24px 0 24px;">'+label+
     '<table width="100%" cellpadding="0" cellspacing="0" border="0">'+
-    '<tr>'+th("Property")+th("Distinguishing Feature")+th("Rate From / Night")+th("Breakfast")+th("City Tax")+th(nights>0?nights+"-Night Total":"Total")+'</tr>'+
+    (isGroup?'<tr>'+th("Property")+th("Room Rate")+th("Distinguishing Feature")+th("Meeting Room")+th("F&B Minimum")+'</tr>':'<tr>'+th("Property")+th("Distinguishing Feature")+th("Rate From / Night")+th("Breakfast")+th("City Tax")+th(nights>0?nights+"-Night Total":"Total")+'</tr>')+
     rows+'</table></td></tr>';
 }
 
 function generateHTML(){
   const p=P, nights=nightsBetween(p.arrival,p.departure);
+  const isGroup=p.proposalType!=="leisure";
+  const party=!isGroup?[(p.adults?esc(p.adults)+" adult"+(String(p.adults)==="1"?"":"s"):""),(p.children?esc(p.children)+" child"+(String(p.children)==="1"?"":"ren"):"")].filter(Boolean).join(", "):"";
   const nLabel=nights>0?nights+"-Night Total":"Total";
   const label=t=>'<div style="font-family:Arial,Helvetica,sans-serif;font-size:9px;letter-spacing:3px;text-transform:uppercase;color:'+GOLD+';padding-bottom:8px;">'+t+'</div>';
   const logo='<img src="'+LOGO_DARK+'" width="200" alt="Sedgemore Travel" style="display:block;width:200px;">';
@@ -221,6 +270,8 @@ function generateHTML(){
     const notes=(h.notes||"").split("\n").map(n=>n.trim()).filter(Boolean);
     const facts=[
       h.cityTax?"City tax: "+esc(h.cityTax):null,
+      isGroup&&h.meetingRoom?"Meeting room: "+esc(h.meetingRoom)+(h.meetingRoomPrice?" — "+esc(h.meetingRoomPrice):""):null,
+      isGroup&&h.fbMinimum?"F&B minimum: "+esc(h.fbMinimum):null,
       h.checkIn?"Check-in: "+esc(h.checkIn):null,
       h.checkOut?"Check-out: "+esc(h.checkOut):null,
       (h.contactName||h.contactEmail)?"Hotel contact: "+[esc(h.contactName),esc(h.contactEmail)].filter(Boolean).join(", "):null
@@ -254,20 +305,20 @@ function generateHTML(){
   '<table width="800" cellpadding="0" cellspacing="0" border="0" style="max-width:800px;margin:0;">'+
     '<tr><td style="padding:36px 24px 24px 24px;">'+logo+'</td></tr>'+
     '<tr><td style="padding:0 24px 24px 24px;border-bottom:2px solid '+GOLD+';">'+
-      label("Proposal")+
+      label(isGroup?"Group Proposal":"Leisure Proposal")+
       '<div style="font-family:Georgia,\'Times New Roman\',serif;font-size:26px;color:'+CHARCOAL+';padding-bottom:10px;">'+(esc(p.destination)||"Destination")+'</div>'+
       '<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:'+CHARCOAL+';line-height:1.7;">'+
-        fmtDate(p.arrival)+(p.departure?" &ndash; "+fmtDate(p.departure):"")+(nights?" &nbsp;&middot;&nbsp; "+nights+" nights":"")+(p.roomsPerNight?" &nbsp;&middot;&nbsp; "+esc(p.roomsPerNight)+" rooms per night":"")+"<br>"+
+        fmtDate(p.arrival)+(p.departure?" &ndash; "+fmtDate(p.departure):"")+(nights?" &nbsp;&middot;&nbsp; "+nights+" nights":"")+(isGroup&&p.roomsPerNight?" &nbsp;&middot;&nbsp; "+esc(p.roomsPerNight)+" rooms per night":"")+(!isGroup&&party?" &nbsp;&middot;&nbsp; "+party:"")+"<br>"+
         (p.client?"Prepared for "+esc(p.client):"")+
       '</div></td></tr>'+
     '<tr><td style="padding:28px 24px 0 24px;">'+label("Overview")+'<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.7;color:'+CHARCOAL+';">'+esc(p.overview)+'</div></td></tr>'+
     atAGlance(p,nights)+
     '<tr><td style="padding:28px 24px 0 24px;"><table width="100%" cellpadding="0" cellspacing="0" border="0">'+
-      '<tr>'+["Arrival","Departure","Rooms per Night"].map(t=>'<td bgcolor="#e8e3db" width="33%" style="background-color:#e8e3db;padding:10px 12px;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;color:'+CHARCOAL+';border-bottom:2px solid '+GOLD+';">'+t+'</td>').join("")+'</tr>'+
+      '<tr>'+["Arrival","Departure",isGroup?"Rooms per Night":"Travellers"].map(t=>'<td bgcolor="#e8e3db" width="33%" style="background-color:#e8e3db;padding:10px 12px;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;color:'+CHARCOAL+';border-bottom:2px solid '+GOLD+';">'+t+'</td>').join("")+'</tr>'+
       '<tr>'+
         '<td style="padding:10px 12px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:'+CHARCOAL+';border-bottom:1px solid #e8e3db;">'+(fmtDate(p.arrival)||"&mdash;")+'</td>'+
         '<td style="padding:10px 12px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:'+CHARCOAL+';border-bottom:1px solid #e8e3db;">'+(fmtDate(p.departure)||"&mdash;")+'</td>'+
-        '<td style="padding:10px 12px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:'+CHARCOAL+';border-bottom:1px solid #e8e3db;">'+(esc(p.roomsPerNight)||"&mdash;")+'</td>'+
+        '<td style="padding:10px 12px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:'+CHARCOAL+';border-bottom:1px solid #e8e3db;">'+(isGroup?(esc(p.roomsPerNight)||"&mdash;"):(party||"&mdash;"))+'</td>'+
       '</tr></table></td></tr>'+
     '<tr><td style="padding:32px 24px 0 24px;">'+label("Rate Summary")+
       '<table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'+th("Property")+th("Room Type")+th("Rate per Night")+th("Breakfast")+th(nLabel)+'</tr>'+summaryRows+'</table></td></tr>'+
@@ -286,11 +337,56 @@ const $=s=>document.querySelector(s);
 function h(html){ const t=document.createElement("template"); t.innerHTML=html.trim(); return t.content.firstChild; }
 function bindInput(el,setter){ el.addEventListener("input",e=>{ setter(e.target.value); updatePreview(); }); }
 
+/* ---------- group / leisure dashboard ---------- */
+function goDashboard(){
+  document.body.classList.add("view-dashboard");
+  document.body.classList.remove("show-preview");
+  refreshDashboardData();
+}
+function goEditor(){
+  document.body.classList.remove("view-dashboard");
+  renderForm(); updatePreview();
+}
+function newProposal(type){ P=blank(type); goEditor(); }
+async function refreshDashboardData(){
+  try{ const [tpls,drs]=await Promise.all([srv.listTemplates(),srv.listDrafts()]); templates=tpls||[]; drafts=drs||[]; }catch(e){}
+  renderDashboard();
+}
+function renderDashboard(){
+  const list=$("#dashDraftsList"); if(!list) return;
+  const status=( $("#dashStatusFilter")||{} ).value||"";
+  const q=(( $("#dashSearch")||{} ).value||"").trim().toLowerCase();
+  list.innerHTML="";
+  let rows=drafts.slice().reverse();
+  if(status) rows=rows.filter(d=>(d.status||"Draft")===status);
+  if(q) rows=rows.filter(d=>(d.name||"").toLowerCase().includes(q));
+  if(!rows.length) list.append(h('<div class="empty-note">No proposals match — create a Group or Leisure proposal above.</div>'));
+  rows.forEach(d=>{
+    const type=d.proposalType==="leisure"?"leisure":"group";
+    const meta='Created by '+esc(d.createdBy||"?")+(d.lastEditedAt?" · "+new Date(d.lastEditedAt).toLocaleDateString("en-GB",{day:"numeric",month:"short"}):"");
+    const row=h('<div class="list-row"><span class="type-badge '+type+'">'+type+'</span><span class="grow">'+esc(d.name)+'<span class="meta">'+meta+'</span></span></div>');
+    const st=h('<select class="status-sel status-'+esc((d.status||"Draft").toLowerCase().replace(/\s+/g,"-"))+'">'+["Draft","Ready to send","Sent","Confirmed","Declined"].map(x=>'<option'+(x===(d.status||"Draft")?" selected":"")+'>'+x+'</option>').join("")+'</select>');
+    st.addEventListener("change",async e=>{ try{ drafts=await srv.setDraftStatus(d.key,e.target.value); renderDashboard(); flash('Status updated to "'+e.target.value+'"'); }catch(err){ flash("Could not update status"); } });
+    const open=h('<button class="btn-tiny">Open</button>'); open.onclick=()=>openDraft(d.key);
+    const del=h('<button class="btn-tiny btn-danger">Delete</button>'); del.onclick=()=>removeDraft(d.key);
+    row.append(st,open,del); list.append(row);
+  });
+  const tpl=$("#dashTemplatesList"); if(!tpl) return; tpl.innerHTML="";
+  if(!templates.length) tpl.append(h('<div class="empty-note">No shared hotel templates yet.</div>'));
+  templates.forEach(t=>{
+    const row=h('<div class="list-row"><span class="grow">'+esc(t.name)+'</span></div>');
+    const del=h('<button class="btn-tiny btn-danger">Delete</button>');
+    del.onclick=async()=>{ try{ templates=await srv.deleteTemplate(t.name); renderDashboard(); flash("Template deleted"); }catch(e){ flash("Could not delete template"); } };
+    row.append(del); tpl.append(row);
+  });
+}
+
 function renderForm(){
   const pane=$("#form-pane"); pane.innerHTML="";
   const nights=nightsBetween(P.arrival,P.departure);
+  const isGroup=P.proposalType!=="leisure";
 
-  if(drafts.length){
+  if(false && drafts.length){
     const card=h('<div class="card"><label class="f">Team proposals (shared)</label></div>');
     drafts.slice().reverse().forEach(d=>{
       const created=d.createdAt?new Date(d.createdAt).toLocaleDateString("en-GB",{day:"numeric",month:"short"}):"";
@@ -311,6 +407,8 @@ function renderForm(){
   const field=(labelText,inputEl)=>{ const f=h('<div class="field"></div>'); f.append(h('<label class="f">'+labelText+'</label>'),inputEl); return f; };
   const txt=(val,setter,ph)=>{ const el=h('<input>'); el.value=val; el.placeholder=ph||""; bindInput(el,setter); return el; };
 
+  pane.append(h('<div class="card" style="border-left:3px solid var(--gold);font-size:12px;line-height:1.5"><b>'+ (isGroup?"Group":"Leisure") +' proposal.</b> '+(isGroup?"Use this flow for room blocks, meetings and group requirements.":"Use this flow for individual travellers and room-by-room options.")+'</div>'));
+
   pane.append(field("Client / Prepared for *",txt(P.client,v=>P.client=v,"e.g. Meridian Capital Partners")));
   pane.append(field("Destination *",txt(P.destination,v=>P.destination=v,"e.g. Milan")));
   const currency=h('<select><option value="EUR">EUR — Euro</option><option value="USD">USD — US Dollar</option><option value="GBP">GBP — British Pound</option></select>');
@@ -321,8 +419,16 @@ function renderForm(){
   const row1=h('<div class="row"></div>');
   const arr=h('<input type="date">'); arr.value=P.arrival; arr.addEventListener("input",e=>{P.arrival=e.target.value; renderForm(); updatePreview();});
   const dep=h('<input type="date">'); dep.value=P.departure; dep.addEventListener("input",e=>{P.departure=e.target.value; renderForm(); updatePreview();});
-  const rpn=h('<input type="number" min="1">'); rpn.value=P.roomsPerNight; bindInput(rpn,v=>P.roomsPerNight=v);
-  row1.append(field("Arrival *",arr),field("Departure *",dep),field("Rooms / night *",rpn));
+  row1.append(field("Arrival *",arr),field("Departure *",dep));
+  if(isGroup){
+    const rpn=h('<input type="number" min="1">'); rpn.value=P.roomsPerNight; bindInput(rpn,v=>P.roomsPerNight=v);
+    const pax=h('<input type="number" min="1">'); pax.value=P.meetingPax; bindInput(pax,v=>P.meetingPax=v);
+    row1.append(field("Rooms / night",rpn),field("Meeting space (pax)",pax));
+  }else{
+    const adults=h('<input type="number" min="0">'); adults.value=P.adults; bindInput(adults,v=>P.adults=v);
+    const children=h('<input type="number" min="0">'); children.value=P.children; bindInput(children,v=>P.children=v);
+    row1.append(field("Adults",adults),field("Children",children));
+  }
   pane.append(row1);
   if(nights>0) pane.append(h('<div class="hint" style="margin:-6px 0 12px">'+nights+' nights &mdash; totals calculated automatically</div>'));
 
@@ -402,6 +508,7 @@ function useUploadedImage(file,im,thumb,warn){
 }
 
 function hotelCard(ht,i,nights){
+  const isGroup=P.proposalType!=="leisure";
   const card=h('<div class="hotel-card"></div>');
   const head=h('<div class="hotel-head"><span class="hotel-num">'+String(i+1).padStart(2,"0")+'</span><span style="font-size:12px;letter-spacing:1px;text-transform:uppercase;flex:1">Hotel</span></div>');
   if(templates.length){
@@ -490,9 +597,16 @@ function hotelCard(ht,i,nights){
   card.append(r2);
 
   const r3=h('<div class="row"></div>');
-  r3.append(field("City tax note",txt(ht.cityTax,v=>ht.cityTax=v)));
+  r3.append(field(isGroup?"Additional fees / city tax":"City tax note",txt(ht.cityTax,v=>ht.cityTax=v)));
   r3.append(field("Check-in",txt(ht.checkIn||"",v=>ht.checkIn=v,"e.g. 15:00")),field("Check-out",txt(ht.checkOut||"",v=>ht.checkOut=v,"e.g. 12:00")));
   card.append(r3);
+
+  if(isGroup){
+    const meeting=h('<div class="row"></div>');
+    meeting.append(field("Meeting room",txt(ht.meetingRoom||"",v=>ht.meetingRoom=v,"e.g. Salon AB · 40 pax")),field("Meeting room price",txt(ht.meetingRoomPrice||"",v=>ht.meetingRoomPrice=v,"e.g. "+P.currency+" 8,535 incl. tax")));
+    card.append(meeting);
+    card.append(field("F&B minimum",txt(ht.fbMinimum||"",v=>ht.fbMinimum=v,"e.g. "+P.currency+" 25,000 minimum spend")));
+  }
 
   const notes=h('<textarea placeholder="Spa access included&#10;Porterage EUR 8 per person"></textarea>');
   notes.value=ht.notes; bindInput(notes,v=>ht.notes=v);
@@ -516,10 +630,11 @@ function hotelCard(ht,i,nights){
 
 /* ---------- actions ---------- */
 async function saveDraft(){
-  const name=(P.destination||"Untitled")+" – "+(P.client||"No client");
-  const key="draft_"+name.replace(/\W+/g,"_").slice(0,120);
+  const type=P.proposalType==="leisure"?"Leisure":"Group";
+  const name="["+type+"] "+(P.destination||"Untitled")+" – "+(P.client||"No client");
+  const key="draft_"+type.toLowerCase()+"_"+name.replace(/\W+/g,"_").slice(0,120);
   P.preparedBy=USER;
-  try{ drafts=await srv.saveDraft(key,name,JSON.stringify(P)); renderForm(); flash("Saved: "+name); }
+  try{ drafts=await srv.saveDraft(key,name,JSON.stringify(P)); flash("Saved: "+name); }
   catch(e){ flash("Could not save draft — "+(e.message||"server request failed")); }
 }
 async function openDraft(key){
@@ -527,11 +642,11 @@ async function openDraft(key){
     const json=await srv.loadDraft(key);
     if(!json){ flash("Draft not found"); return; }
     P=normalizeProposal(JSON.parse(json));
-    renderForm(); updatePreview(); flash("Draft loaded");
+    goEditor(); flash("Draft loaded");
   }catch(e){ flash("Could not load draft"); }
 }
 async function removeDraft(key){
-  try{ drafts=await srv.deleteDraft(key); renderForm(); flash("Draft deleted"); }
+  try{ drafts=await srv.deleteDraft(key); renderDashboard(); flash("Draft deleted"); }
   catch(e){ flash("Could not delete draft"); }
 }
 async function copyForGmail(){
@@ -580,7 +695,7 @@ function setTab(t,btn){
     templates=tpls||[]; drafts=drs||[];
   }catch(e){ flash("Loaded in offline mode — saving is unavailable"); }
   document.getElementById("loading").remove();
-  renderForm(); updatePreview();
+  goDashboard();
 })();
 </script>
 </body>
