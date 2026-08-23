@@ -230,8 +230,10 @@ function imagesBlock(images,alt,colspan=1){
 
 /* At a Glance — one-look comparison of how the properties differ, built from hotel inputs */
 function atAGlance(p,nights){
-  if(p.hotels.length<2) return ""; // comparison only makes sense with 2+ properties
   const isGroup=p.proposalType!=="leisure";
+  // Group proposals proceed directly to the stay details; this comparison is
+  // reserved for Leisure proposals, where the distinguishing feature is useful.
+  if(isGroup || p.hotels.length<2) return "";
   const hasMeeting=p.hotels.some(h=>String(h.meetingRoom||h.meetingRoomPrice||"").trim());
   const hasFbMinimum=p.hotels.some(h=>String(h.fbMinimum||"").trim());
   const label='<div style="font-family:Arial,Helvetica,sans-serif;font-size:9px;letter-spacing:3px;text-transform:uppercase;color:'+GOLD+';padding-bottom:8px;">At a Glance</div>';
@@ -546,7 +548,7 @@ function hotelCard(ht,i,nights){
   card.append(r1);
   const desc=h('<textarea placeholder="2–3 sentence property description"></textarea>'); desc.value=ht.description; bindInput(desc,v=>ht.description=v);
   card.append(field("Description *",desc));
-  card.append(field('Distinguishing feature <span style="text-transform:none;letter-spacing:0">(one line — appears in the At a Glance comparison)</span>',txt(ht.highlight||"",v=>ht.highlight=v,"e.g. Rooftop terrace, closest to the Duomo")));
+  if(!isGroup) card.append(field('Distinguishing feature <span style="text-transform:none;letter-spacing:0">(one line — appears in the At a Glance comparison)</span>',txt(ht.highlight||"",v=>ht.highlight=v,"e.g. Rooftop terrace, closest to the Duomo")));
 
   function imageControls(owner,kind){
     owner.images=owner.images||[];
