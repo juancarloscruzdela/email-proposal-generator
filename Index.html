@@ -136,7 +136,7 @@ const LOGO_WHITE="https://www.sedgemoretravel.com/wp-content/uploads/2023/07/Gro
 const uid=()=>Math.random().toString(36).slice(2,9);
 const esc=s=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 const fmt=n=>isNaN(n)?"0":Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,",");
-const CURRENCIES={EUR:"EUR",USD:"USD",GBP:"GBP"};
+const CURRENCIES={EUR:"EUR",USD:"USD",GBP:"GBP",THB:"THB"};
 const money=(n,currency=P.currency)=>((CURRENCIES[currency]||CURRENCIES.EUR)+" "+fmt(n));
 const fmtDate=iso=>{ if(!iso) return ""; const d=new Date(iso+"T12:00:00"); return isNaN(d)?iso:d.toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"}); };
 const nightsBetween=(a,b)=>{ if(!a||!b) return 0; const ms=new Date(b)-new Date(a); return ms>0?Math.round(ms/864e5):0; };
@@ -146,9 +146,9 @@ const IMG_SIZES={ full:{w:752,min:752,label:"Full width"}, half:{w:370,min:370,l
 const IMG_MAX_NATURAL=2400; // above this, file likely heavy for email
 
 const DEFAULT_OVERVIEW="We are delighted to present the following proposal for your group stay. Each property below has been selected for its location, service standard and suitability for your group, with rates held on a provisional basis pending confirmation.";
-const newRoom=()=>({id:uid(),type:"",rooms:"",rate:""});
+const newRoom=()=>({id:uid(),type:"",rooms:"",rate:"",images:[]});
 const newHotel=()=>({id:uid(),name:"",brand:"",address:"",description:"",highlight:"",images:[],rooms:[newRoom()],vat:"included",vatPct:"10",breakfast:"Included",cityTax:"EUR 12 per person per night",meetingRoom:"",meetingRoomPrice:"",fbMinimum:"",checkIn:"15:00",checkOut:"12:00",notes:"",contactName:"",contactEmail:""});
-const blank=type=>({proposalType:type||"group",client:"",destination:"",currency:"EUR",arrival:"",departure:"",roomsPerNight:"",meetingPax:"",adults:"",children:"",overview:DEFAULT_OVERVIEW,senderName:"",senderEmail:"",preparedBy:"",hotels:[newHotel()]});
+const blank=type=>({draftKey:"",proposalType:type||"group",client:"",destination:"",currency:"EUR",arrival:"",departure:"",roomsPerNight:"",meetingPax:"",adults:"",children:"",overview:DEFAULT_OVERVIEW,senderName:"",senderEmail:"",preparedBy:"",hotels:[newHotel()]});
 
 let P=blank("group"), templates=[], drafts=[], USER="";
 
@@ -175,15 +175,21 @@ function td(content,i,extra){ extra=extra||""; const bg=i%2?"#f9f7f4":"#ffffff";
 function th(t){ return '<td bgcolor="#e8e3db" style="background-color:#e8e3db;padding:10px 12px;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;color:'+CHARCOAL+';border-bottom:2px solid '+GOLD+';">'+t+'</td>'; }
 const roomTotal=(r,n)=>(parseFloat(r.rooms)||0)*(parseFloat(r.rate)||0)*n;
 const hotelTotal=(h,n)=>h.rooms.reduce((s,r)=>s+roomTotal(r,n),0);
-const vatLabel=h=>h.vat==="excluded"?" + "+esc(h.vatPct||10)+"% VAT":" (VAT incl.)";
+const vatLabel=h=>h.vat==="excluded"?" + "+esc(h.vatPct||10)+"% VAT":(h.vat==="included"?" (VAT incl.)":"");
 
 /* Keep saved drafts and templates from earlier versions usable. */
 function normalizeHotel(h){
-  h.images=(h.images||[]).map(im=>{
+  const normalizeImages=images=>(images||[]).map(im=>{
     const image=typeof im==="string"?{url:im,size:"full"}:im;
     if(image.url&&image.url.startsWith("data:image/")) image.source="upload";
     return image;
   });
+  h.rooms=(h.rooms&&h.rooms.length?h.rooms:[newRoom()]).map(r=>{
+    r.id=r.id||uid();
+    r.images=normalizeImages(r.images);
+    return r;
+  });
+  h.images=normalizeImages(h.images);
   if(h.checkIn===undefined || h.checkOut===undefined){
     const legacy=(h.checkInOut||"").split("/").map(v=>v.trim());
     h.checkIn=h.checkIn===undefined?(legacy[0]||""):h.checkIn;
@@ -195,27 +201,28 @@ function normalizeHotel(h){
 function normalizeProposal(p){
   p.proposalType=p.proposalType==="leisure"?"leisure":"group";
   p.currency=CURRENCIES[p.currency]?p.currency:"EUR";
+  p.draftKey=p.draftKey||"";
   p.meetingPax=p.meetingPax||""; p.adults=p.adults||""; p.children=p.children||"";
   p.hotels=(p.hotels&&p.hotels.length?p.hotels:[newHotel()]).map(normalizeHotel);
   return p;
 }
 
-function imagesBlock(h){
-  const imgs=(h.images||[]).filter(im=>im.url && im.url.trim());
+function imagesBlock(images,alt,colspan=1){
+  const imgs=(images||[]).filter(im=>im.url && im.url.trim());
   if(!imgs.length) return "";
   let out="", i=0;
   while(i<imgs.length){
     const im=imgs[i];
     if(im.size==="full"||!im.size){
-      out+='<tr><td style="padding:16px 0 0 0;"><img src="'+esc(im.url.trim())+'" width="752" alt="'+esc(h.name)+'" style="display:block;width:100%;max-width:752px;height:auto;border:0;"></td></tr>';
+      out+='<tr><td colspan="'+colspan+'" style="padding:16px 0 0 0;"><img src="'+esc(im.url.trim())+'" width="752" alt="'+esc(alt)+'" style="display:block;width:100%;max-width:752px;height:auto;border:0;"></td></tr>';
       i++;
     } else {
       // collect run of same non-full size, lay out in a row
       const size=im.size, per=size==="half"?2:3, w=IMG_SIZES[size].w;
       const run=[];
       while(i<imgs.length && imgs[i].size===size && run.length<per){ run.push(imgs[i]); i++; }
-      const cells=run.map((r,ix)=>'<td width="'+Math.floor(100/per)+'%" style="padding:0 '+(ix<run.length-1?'8px':'0')+' 8px 0;"><img src="'+esc(r.url.trim())+'" width="'+w+'" alt="'+esc(h.name)+'" style="display:block;width:100%;max-width:'+w+'px;height:auto;border:0;"></td>').join("");
-      out+='<tr><td style="padding:16px 0 0 0;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'+cells+'</tr></table></td></tr>';
+      const cells=run.map((r,ix)=>'<td width="'+Math.floor(100/per)+'%" style="padding:0 '+(ix<run.length-1?'8px':'0')+' 8px 0;"><img src="'+esc(r.url.trim())+'" width="'+w+'" alt="'+esc(alt)+'" style="display:block;width:100%;max-width:'+w+'px;height:auto;border:0;"></td>').join("");
+      out+='<tr><td colspan="'+colspan+'" style="padding:16px 0 0 0;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'+cells+'</tr></table></td></tr>';
     }
   }
   return out;
@@ -225,6 +232,8 @@ function imagesBlock(h){
 function atAGlance(p,nights){
   if(p.hotels.length<2) return ""; // comparison only makes sense with 2+ properties
   const isGroup=p.proposalType!=="leisure";
+  const hasMeeting=p.hotels.some(h=>String(h.meetingRoom||h.meetingRoomPrice||"").trim());
+  const hasFbMinimum=p.hotels.some(h=>String(h.fbMinimum||"").trim());
   const label='<div style="font-family:Arial,Helvetica,sans-serif;font-size:9px;letter-spacing:3px;text-transform:uppercase;color:'+GOLD+';padding-bottom:8px;">At a Glance</div>';
   const minRate=h=>{ const rates=h.rooms.map(r=>parseFloat(r.rate)).filter(n=>!isNaN(n)&&n>0); return rates.length?Math.min.apply(null,rates):null; };
   const rows=p.hotels.map((h,i)=>{
@@ -233,8 +242,8 @@ function atAGlance(p,nights){
       td(from!==null?"From "+money(from,p.currency):"&mdash;",i,"white-space:nowrap;");
     if(isGroup) return "<tr>"+common+
       td(h.highlight?esc(h.highlight):"&mdash;",i)+
-      td(esc(h.meetingRoom)||"&mdash;",i)+
-      td(esc(h.fbMinimum)||"&mdash;",i)+
+      (hasMeeting?td(esc(h.meetingRoom)||"&mdash;",i):"")+
+      (hasFbMinimum?td(esc(h.fbMinimum)||"&mdash;",i):"")+
     "</tr>";
     return "<tr>"+
       td('<span style="color:'+GOLD+';font-family:Georgia,serif;">'+String(i+1).padStart(2,"0")+'</span>&nbsp; <b>'+(esc(h.name)||"Hotel")+'</b>'+(h.brand?'<br><span style="color:#6b6459;">'+esc(h.brand)+'</span>':""),i)+
@@ -247,7 +256,7 @@ function atAGlance(p,nights){
   }).join("");
   return '<tr><td style="padding:28px 24px 0 24px;">'+label+
     '<table width="100%" cellpadding="0" cellspacing="0" border="0">'+
-    (isGroup?'<tr>'+th("Property")+th("Room Rate")+th("Distinguishing Feature")+th("Meeting Room")+th("F&B Minimum")+'</tr>':'<tr>'+th("Property")+th("Distinguishing Feature")+th("Rate From / Night")+th("Breakfast")+th("City Tax")+th(nights>0?nights+"-Night Total":"Total")+'</tr>')+
+    (isGroup?'<tr>'+th("Property")+th("Room Rate")+th("Distinguishing Feature")+(hasMeeting?th("Meeting Space"):"")+(hasFbMinimum?th("F&B Minimum"):"")+'</tr>':'<tr>'+th("Property")+th("Distinguishing Feature")+th("Rate From / Night")+th("Breakfast")+th("City Tax")+th(nights>0?nights+"-Night Total":"Total")+'</tr>')+
     rows+'</table></td></tr>';
 }
 
@@ -266,7 +275,7 @@ function generateHTML(){
   }).join("");
 
   const hotelSections=p.hotels.map((h,idx)=>{
-    const rows=h.rooms.map((r,i)=>"<tr>"+td(esc(r.type)||"&mdash;",i)+td(esc(r.rooms)||"&mdash;",i,"text-align:center;")+td(r.rate?money(parseFloat(r.rate),p.currency):"&mdash;",i)+td(money(roomTotal(r,nights),p.currency),i,"white-space:nowrap;")+"</tr>").join("");
+    const rows=h.rooms.map((r,i)=>"<tr>"+td(esc(r.type)||"&mdash;",i)+td(esc(r.rooms)||"&mdash;",i,"text-align:center;")+td(r.rate?money(parseFloat(r.rate),p.currency):"&mdash;",i)+td(money(roomTotal(r,nights),p.currency),i,"white-space:nowrap;")+"</tr>"+imagesBlock(r.images,(h.name||"Hotel")+" — "+(r.type||"Room"),4)).join("");
     const notes=(h.notes||"").split("\n").map(n=>n.trim()).filter(Boolean);
     const facts=[
       h.cityTax?"City tax: "+esc(h.cityTax):null,
@@ -284,7 +293,7 @@ function generateHTML(){
             '<td><div style="font-family:Georgia,\'Times New Roman\',serif;font-size:20px;color:'+CHARCOAL+';">'+(esc(h.name)||"Hotel")+'</div>'+
             '<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6b6459;padding-top:4px;">'+[esc(h.brand),esc(h.address)].filter(Boolean).join(" &middot; ")+'</div></td>'+
           '</tr></table></td></tr>'+
-        imagesBlock(h)+
+        imagesBlock(h.images,h.name||"Hotel")+
         (h.description?'<tr><td style="padding:16px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.6;color:'+CHARCOAL+';">'+esc(h.description)+'</td></tr>':"")+
         '<tr><td><table width="100%" cellpadding="0" cellspacing="0" border="0">'+
           '<tr>'+th("Room Category")+th("Rooms")+th("Rate per Night")+th(nLabel)+'</tr>'+rows+
@@ -411,7 +420,7 @@ function renderForm(){
 
   pane.append(field("Client / Prepared for *",txt(P.client,v=>P.client=v,"e.g. Meridian Capital Partners")));
   pane.append(field("Destination *",txt(P.destination,v=>P.destination=v,"e.g. Milan")));
-  const currency=h('<select><option value="EUR">EUR — Euro</option><option value="USD">USD — US Dollar</option><option value="GBP">GBP — British Pound</option></select>');
+  const currency=h('<select><option value="EUR">EUR — Euro</option><option value="USD">USD — US Dollar</option><option value="GBP">GBP — British Pound</option><option value="THB">THB — Thai Baht</option></select>');
   currency.value=P.currency;
   currency.addEventListener("change",e=>{ P.currency=e.target.value; renderForm(); updatePreview(); });
   pane.append(field("Proposal currency",currency));
@@ -539,17 +548,16 @@ function hotelCard(ht,i,nights){
   card.append(field("Description *",desc));
   card.append(field('Distinguishing feature <span style="text-transform:none;letter-spacing:0">(one line — appears in the At a Glance comparison)</span>',txt(ht.highlight||"",v=>ht.highlight=v,"e.g. Rooftop terrace, closest to the Duomo")));
 
-  /* Image URLs or locally uploaded image files with size control + dimension check */
-  card.append(h('<label class="f">Hotel images</label>'));
-  ht.images=ht.images||[];
-  ht.images.forEach((im,ix)=>{
-    if(typeof im==="string"){ im={url:im,size:"full"}; ht.images[ix]=im; }
+  function imageControls(owner,kind){
+    owner.images=owner.images||[];
+    owner.images.forEach((im,ix)=>{
+      if(typeof im==="string"){ im={url:im,size:"full"}; owner.images[ix]=im; }
     const row=h('<div class="img-row"></div>');
     const thumb=h('<img class="img-thumb" alt="">'); if(im.url&&im.url.trim()) thumb.src=im.url.trim();
     thumb.onerror=()=>thumb.removeAttribute("src");
     const inp=h('<input placeholder="Image URL (https://…/image.jpg)">'); inp.value=(im.source==="upload"||(im.url||"").startsWith("data:image/"))?"":(im.url||"");
     const sizeSel=h('<select class="img-size"><option value="full">Full width</option><option value="half">Half width</option><option value="third">One-third</option></select>');
-    const upload=h('<input class="img-upload" type="file" accept="image/*" aria-label="Upload hotel image">');
+    const upload=h('<input class="img-upload" type="file" accept="image/*" aria-label="Upload '+kind.toLowerCase()+' image">');
     const uploadBtn=h('<button class="btn-tiny img-upload-btn">'+(im.source==="upload"?"Replace image":"Upload image")+'</button>');
     sizeSel.value=im.size||"full";
     const warn=imgWarnEl();
@@ -557,15 +565,18 @@ function hotelCard(ht,i,nights){
     sizeSel.addEventListener("change",e=>{ im.size=e.target.value; checkImage(im,warn); updatePreview(); });
     uploadBtn.onclick=()=>upload.click();
     upload.addEventListener("change",e=>{ useUploadedImage(e.target.files[0],im,thumb,warn); e.target.value=""; });
-    const del=h('<button class="btn-tiny btn-danger">×</button>'); del.onclick=()=>{ ht.images.splice(ix,1); renderForm(); updatePreview(); };
+    const del=h('<button class="btn-tiny btn-danger">×</button>'); del.onclick=()=>{ owner.images.splice(ix,1); renderForm(); updatePreview(); };
     row.append(thumb,inp,sizeSel,upload,uploadBtn,del);
     card.append(row); card.append(warn);
     checkImage(im,warn);
-  });
-  const addImg=h('<button class="btn-ghost" style="margin-bottom:12px">+ Add image</button>');
-  addImg.onclick=()=>{ ht.images.push({url:"",size:"full"}); renderForm(); };
-  card.append(addImg);
-  card.append(h('<div class="hint" style="margin:-6px 0 12px">Paste a direct image link or choose an image file from your computer (up to 2 MB). Uploaded images receive a direct link so they work in Gmail, downloads, and saved drafts. Full width renders at 752px, half at 370px, and one-third at 243px; the check below each image tells you if the source is large enough. Check brand usage rights before including portal assets.</div>'));
+    });
+    const addImg=h('<button class="btn-ghost" style="margin-bottom:12px">+ Add '+kind.toLowerCase()+' image</button>');
+    addImg.onclick=()=>{ owner.images.push({url:"",size:"full"}); renderForm(); };
+    card.append(addImg);
+  }
+
+  card.append(h('<label class="f">Hotel images <span style="text-transform:none;letter-spacing:0">(optional — shown below the hotel heading)</span></label>'));
+  imageControls(ht,"Hotel");
 
   card.append(h('<label class="f">Room categories</label>'));
   ht.rooms.forEach(r=>{
@@ -579,15 +590,18 @@ function hotelCard(ht,i,nights){
     const del=h('<button class="btn-tiny btn-danger">×</button>'); del.disabled=ht.rooms.length===1;
     del.onclick=()=>{ ht.rooms=ht.rooms.filter(x=>x.id!==r.id); renderForm(); updatePreview(); };
     row.append(t,n,rt,tot,del); card.append(row);
+    card.append(h('<label class="f" style="margin-top:4px">Images for '+(esc(r.type)||"this room")+'</label>'));
+    imageControls(r,"Room");
   });
   const addRoom=h('<button class="btn-ghost" style="margin-bottom:12px">+ Add room type</button>');
   addRoom.onclick=()=>{ ht.rooms.push(newRoom()); renderForm(); };
   card.append(addRoom);
+  card.append(h('<div class="hint" style="margin:-6px 0 12px">Add images to each room type. Paste a direct image link or choose an image file (up to 2 MB). Uploaded images receive a direct link so they work in Gmail, downloads, and saved drafts. Full width renders at 752px, half at 370px, and one-third at 243px.</div>'));
 
   const r2=h('<div class="row"></div>');
-  const vatSel=h('<select><option value="included">Included</option><option value="excluded">Excluded</option></select>');
+  const vatSel=h('<select><option value="included">Included</option><option value="excluded">Excluded</option><option value="none">Not applicable</option></select>');
   vatSel.value=ht.vat; vatSel.addEventListener("change",e=>{ ht.vat=e.target.value; renderForm(); updatePreview(); });
-  const vatF=(()=>{const f=h('<div class="field" style="flex:none;width:130px"></div>'); f.append(h('<label class="f">VAT *</label>'),vatSel); return f;})();
+  const vatF=(()=>{const f=h('<div class="field" style="flex:none;width:150px"></div>'); f.append(h('<label class="f">VAT</label>'),vatSel); return f;})();
   r2.append(vatF);
   if(ht.vat==="excluded"){
     const pct=h('<input type="number">'); pct.value=ht.vatPct; bindInput(pct,v=>ht.vatPct=v);
@@ -632,7 +646,8 @@ function hotelCard(ht,i,nights){
 async function saveDraft(){
   const type=P.proposalType==="leisure"?"Leisure":"Group";
   const name="["+type+"] "+(P.destination||"Untitled")+" – "+(P.client||"No client");
-  const key="draft_"+type.toLowerCase()+"_"+name.replace(/\W+/g,"_").slice(0,120);
+  const key=P.draftKey||("draft_"+type.toLowerCase()+"_"+uid());
+  P.draftKey=key;
   P.preparedBy=USER;
   try{ drafts=await srv.saveDraft(key,name,JSON.stringify(P)); flash("Saved: "+name); }
   catch(e){ flash("Could not save draft — "+(e.message||"server request failed")); }
@@ -642,6 +657,7 @@ async function openDraft(key){
     const json=await srv.loadDraft(key);
     if(!json){ flash("Draft not found"); return; }
     P=normalizeProposal(JSON.parse(json));
+    P.draftKey=key;
     goEditor(); flash("Draft loaded");
   }catch(e){ flash("Could not load draft"); }
 }

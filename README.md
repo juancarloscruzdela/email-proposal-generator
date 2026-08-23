@@ -14,9 +14,9 @@ No packages need to be installed. Drafts, templates, and sender defaults are sto
 
 Every page and API request is protected with HTTP Basic Authentication. The signed-in username is displayed by the app and recorded as the editor of saved drafts and templates.
 
-## Hotel images
+## Hotel and room images
 
-Each hotel image can use either a direct image URL or a file uploaded from your computer (JPG, PNG, WebP, or GIF, up to 2 MB). Uploaded files are saved in `.data/hotel-images` and are given an unlisted public image URL so Gmail recipients can load them; only use images you are comfortable sharing with proposal recipients.
+Each hotel can have optional images shown below its heading, and each room type can have its own images shown with that room's rate. Images can use either a direct image URL or a file uploaded from your computer (JPG, PNG, WebP, or GIF, up to 2 MB). Uploaded files are saved in `.data/hotel-images` and are given an unlisted public image URL so Gmail recipients can load them; only use images you are comfortable sharing with proposal recipients.
 
 ## Troubleshooting saves
 

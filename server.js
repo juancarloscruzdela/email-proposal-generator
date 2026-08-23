@@ -147,7 +147,7 @@ const server = http.createServer((request, response) => {
   }
   if (request.method === "POST" && (url.pathname === "/api" || url.pathname.endsWith("/api"))) {
     let body = "";
-    // Uploaded hotel images are embedded in saved draft JSON. Keep a bounded but
+    // Uploaded room images are embedded in saved draft JSON. Keep a bounded but
     // practical ceiling for a proposal containing up to ten 2 MB images.
     request.on("data", chunk => { body += chunk; if (body.length > 30_000_000) request.destroy(); });
     return request.on("end", () => {
